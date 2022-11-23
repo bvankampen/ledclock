@@ -12,5 +12,10 @@ Led Clock based on a ESP8266. Built with VSCode and PlatformIO
 Not available yet
 
 ## NodeMCU
-[pinout](https://cdn.shopify.com/s/files/1/1509/1638/files/NodeMCU_LUA_Amica_V2_Pinout_Diagram.pdf?14596320546790113351)
-[datasheet](https://cdn.shopify.com/s/files/1/1509/1638/files/NodeMCU_LUA_Amica_V2_Modul_mit_ESP8266_12E_Datenblatt.pdf?10729131952355562192)
+- [pinout](https://cdn.shopify.com/s/files/1/1509/1638/files/NodeMCU_LUA_Amica_V2_Pinout_Diagram.pdf?14596320546790113351)
+- [datasheet](https://cdn.shopify.com/s/files/1/1509/1638/files/NodeMCU_LUA_Amica_V2_Modul_mit_ESP8266_12E_Datenblatt.pdf?10729131952355562192)
+
+## Libraries Used
+- [RTCLib](https://github.com/adafruit/RTClib)
+- [MD_MAX72XX](https://github.com/MajicDesigns/MD_MAX72XX)
+- [NTPClient](https://github.com/arduino-libraries/NTPClient)
