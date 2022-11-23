@@ -20,6 +20,9 @@
 #define SDA 4
 #define SCL 5
 
+#define CLOCK_ON 8
+#define CLOCK_OFF 23
+
 #define NTP_UPDATE_INTERVAL 3600
 
 const char *ssid = WIFI_SSID;
@@ -81,6 +84,19 @@ char *getTime()
   return now.toString(f);
 }
 
+bool displayEnabled()
+{
+  DateTime now = rtc.now();
+  if (now.hour() >= CLOCK_ON && now.hour() < CLOCK_OFF)
+  {
+    return true;
+  }
+  else
+  {
+    return false;
+  }
+}
+
 void setTime()
 {
   if (timeClient.getEpochTime() - lastRefresh > NTP_UPDATE_INTERVAL)
@@ -98,6 +114,13 @@ void setTime()
     Serial.println(timeClient.getFormattedTime());
     lastRefresh = timeClient.getEpochTime();
   }
+}
+
+void showZeroTime()
+{
+  char zero[9];
+  sprintf(zero, "00:00:00");
+  printTime(zero);
 }
 
 void setup()
@@ -127,12 +150,21 @@ void setup()
   mx.begin();
   mx.control(MD_MAX72XX::INTENSITY, LED_INTENSITY);
 
+  showZeroTime();
+
   setTime();
 }
 
 void loop()
 {
   setTime();
-  printTime(getTime());
+  if (displayEnabled())
+  {
+    printTime(getTime());
+  }
+  else
+  {
+    mx.clear();
+  }
   delay(1000);
 }
