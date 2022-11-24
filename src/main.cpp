@@ -126,7 +126,7 @@ void printTimeSerial(char *c) {
 
 void printTime(char newTime[7])
 {
-  printTimeSerial(newTime);
+  //printTimeSerial(newTime);
   //fillBuffer(newTime);
   printTimeSerial(newTime);
   // for (int i = 0; i < 8; i++)
