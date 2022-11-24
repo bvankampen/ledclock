@@ -15,10 +15,12 @@
 #define CS_PIN 15
 
 #define LED_INTENSITY 0
-#define MAX_COL 31
+#define MAX_COL 30
 
 #define SDA 4
 #define SCL 5
+
+// #define WIFI
 
 #define CLOCK_ON 8
 #define CLOCK_OFF 23
@@ -30,62 +32,122 @@ const char *password = WIFI_PASSWORD;
 
 u_int32_t lastRefresh = 0;
 
+#ifdef WIFI
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
+#endif
 
 MD_MAX72XX mx = MD_MAX72XX(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
 RTC_DS3231 rtc;
 
-u_int16_t printNumber(u_int8_t number, u_int16_t currentCol)
-{
-  for (u_int8_t i = 0; i < 3; i++)
-  {
-    mx.setColumn(currentCol, numbers[number][i]);
-    currentCol--;
-  }
-  currentCol--;
-  return currentCol;
-}
+char lastTime[7];
 
-u_int16_t printPoints(u_int16_t currentCol)
-{
-  mx.setColumn(currentCol, points);
-  currentCol -= 2;
-  return currentCol;
-}
+u_int16_t buffer[18] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+// u_int16_t printNumber(u_int8_t number, u_int16_t currentCol)
+// {
+//   for (u_int8_t i = 0; i < 3; i++)
+//   {
+//     mx.setColumn(currentCol, numbers[number][i]);
+//     currentCol--;
+//   }
+//   currentCol--;
+//   return currentCol;
+// }
+
+// u_int16_t printPoints(u_int16_t currentCol)
+// {
+//   mx.setColumn(currentCol, points);
+//   currentCol -= 2;
+//   return currentCol;
+// }
 
 u_int8_t charToInt(char c)
 {
   return c - 48;
 }
 
-void printTime(char time[9])
+// void printTime(char time[9])
+// {
+//   u_int16_t currentCol = MAX_COL - 1;
+//   mx.control(0, MAX_DEVICES - 1, MD_MAX72XX::UPDATE, MD_MAX72XX::OFF);
+//   for (u_int8_t i = 0; i < 8; i++)
+//   {
+//     if (time[i] == ':')
+//     {
+//       currentCol = printPoints(currentCol);
+//     }
+//     else
+//     {
+//       currentCol = printNumber(charToInt(time[i]), currentCol);
+//     }
+//   }
+//   mx.control(0, MAX_DEVICES - 1, MD_MAX72XX::UPDATE, MD_MAX72XX::ON);
+// }
+
+void fillBuffer(char *newTime)
 {
-  u_int16_t currentCol = MAX_COL - 1;
-  mx.control(0, MAX_DEVICES - 1, MD_MAX72XX::UPDATE, MD_MAX72XX::OFF);
-  for (u_int8_t i = 0; i < 8; i++)
+  int buf = 0;
+  for (int i = 0; i < 7; i++)
   {
-    if (time[i] == ':')
+    numbers[charToInt(newTime[i])];
+    for (int j = 0; j < 3; j++)
     {
-      currentCol = printPoints(currentCol);
-    }
-    else
-    {
-      currentCol = printNumber(charToInt(time[i]), currentCol);
+      buffer[buf] = (numbers[charToInt(lastTime[i])][j] << 8) + numbers[charToInt(newTime[i])][j];
+      buf++;
     }
   }
+}
+
+void printBuffer()
+{
+  int col = MAX_COL;
+  mx.control(0, MAX_DEVICES - 1, MD_MAX72XX::UPDATE, MD_MAX72XX::OFF);
+  for (int i = 0; i < 18; i++)
+  {
+    if (i % 3 == 0 && i > 0)
+      col--;
+    if (i % 6 == 0 && i > 0) {
+      mx.setColumn(col, points);
+      col-=2;
+    }
+    mx.setColumn(col, (buffer[i] >> 8) & 0b00111110);
+    col--;
+  }
   mx.control(0, MAX_DEVICES - 1, MD_MAX72XX::UPDATE, MD_MAX72XX::ON);
+}
+
+void printTimeSerial(char *c) {
+  for(u_int16_t i=0;i < 6; i++) {
+    Serial.print(c[i]);
+  }
+  Serial.println();
+}
+
+void printTime(char newTime[7])
+{
+  printTimeSerial(newTime);
+  //fillBuffer(newTime);
+  printTimeSerial(newTime);
+  // for (int i = 0; i < 8; i++)
+  // {
+  // printBuffer();
+  // }
+  // 
+  //strcpy(lastTime, time);
 }
 
 char *getTime()
 {
   DateTime now = rtc.now();
-  char f[] = "hh:mm:ss";
+  char f[] = "hhmmss";
   return now.toString(f);
 }
 
+
 bool displayEnabled()
 {
+  return true;
   DateTime now = rtc.now();
   if (now.hour() >= CLOCK_ON && now.hour() < CLOCK_OFF)
   {
@@ -99,6 +161,7 @@ bool displayEnabled()
 
 void setTime()
 {
+  #ifdef WIFI
   if (timeClient.getEpochTime() - lastRefresh > NTP_UPDATE_INTERVAL)
   {
     Serial.println("Set Time with NTP");
@@ -114,14 +177,15 @@ void setTime()
     Serial.println(timeClient.getFormattedTime());
     lastRefresh = timeClient.getEpochTime();
   }
+  #endif
 }
 
-void showZeroTime()
-{
-  char zero[9];
-  sprintf(zero, "00:00:00");
-  printTime(zero);
-}
+// void showZeroTime()
+// {
+//   char zero[9];
+//   sprintf(zero, "00:00:00");
+//   printTime(zero);
+// }
 
 void setup()
 {
@@ -129,6 +193,8 @@ void setup()
   Wire.begin(SDA, SCL);
   Serial.begin(9600);
   Serial.println("Setup Routine");
+
+  #ifdef WIFI
 
   Serial.println("Connect to Wifi");
   WiFi.begin(ssid, password);
@@ -141,16 +207,21 @@ void setup()
 
   timeClient.begin();
 
+  #endif
+
   Serial.println("Setup RTC");
-  if (!rtc.begin())
+  while (!rtc.begin())
   {
     Serial.println("Couldn't find RTC");
+    delay(500);
   }
 
   mx.begin();
   mx.control(MD_MAX72XX::INTENSITY, LED_INTENSITY);
 
-  showZeroTime();
+  //strcpy(lastTime, "000000");
+
+  // showZeroTime();
 
   setTime();
 }
