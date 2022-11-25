@@ -22,6 +22,7 @@
 
 #define CLOCK_ON 8
 #define CLOCK_OFF 23
+#define ALWAYS_ON 0
 
 #define NTP_UPDATE_INTERVAL 3600
 
@@ -86,6 +87,7 @@ char *getTime()
 
 bool displayEnabled()
 {
+  if (ALWAYS_ON) return true;
   DateTime now = rtc.now();
   if (now.hour() >= CLOCK_ON && now.hour() < CLOCK_OFF)
   {
