@@ -17,6 +17,13 @@
 #define LED_INTENSITY 0
 #define MAX_COL 30
 
+#define RED 0   // WIFI
+#define BLUE 16 // CLOCK
+#define GREEN 2 // NTP
+
+#define BUTTON_1 10
+#define BUTTON_2 9
+
 // #define MASK 0b00111110
 #define MASK 0b11111111
 
@@ -43,6 +50,9 @@ NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
 
 MD_MAX72XX mx = MD_MAX72XX(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
 RTC_DS3231 rtc;
+
+bool always_light_on = false;
+byte button_1_last_state = 1;
 
 void printTimeSerial(const char *msg, byte *time)
 {
@@ -113,15 +123,40 @@ bool timeChanged(byte newTime[], byte lastTime[])
   return false;
 }
 
+bool displayEnabled()
+{
+  if (ALWAYS_ON)
+    return true;
+  DateTime now = rtc.now();
+  if (now.hour() == CLOCK_ON && always_light_on) {
+    always_light_on = false; // reset setting in the morning
+  }
+  if ((now.hour() >= CLOCK_ON && now.hour() < CLOCK_OFF) || always_light_on)
+  {
+    return true;
+  }
+  else
+  {
+    return false;
+  }
+}
+
 void printTime(word buffer[], byte newTime[], byte lastTime[], bool force)
 {
   if (!timeChanged(newTime, lastTime) && !force)
     return;
-  for (byte i = 0; i < 9; i++)
+  if (displayEnabled())
   {
-    printBuffer(buffer, newTime, lastTime, force);
-    shiftBuffer(buffer);
-    delay(50);
+    for (byte i = 0; i < 9; i++)
+    {
+      printBuffer(buffer, newTime, lastTime, force);
+      shiftBuffer(buffer);
+      delay(50);
+    }
+  }
+  else
+  {
+    mx.clear();
   }
 }
 
@@ -136,31 +171,22 @@ void getTime(byte newTime[])
   newTime[5] = now.second() - (newTime[4] * 10);
 }
 
-bool displayEnabled()
-{
-  if (ALWAYS_ON) return true;
-  DateTime now = rtc.now();
-  if (now.hour() >= CLOCK_ON && now.hour() < CLOCK_OFF)
-  {
-    return true;
-  }
-  else
-  {
-    return false;
-  }
-}
-
 void setTime()
 {
 #ifdef WIFI
   if (timeClient.getEpochTime() - lastRefresh > NTP_UPDATE_INTERVAL)
   {
-    Serial.println("Set Time with NTP");
     while (!timeClient.isTimeSet())
     {
+      digitalWrite(GREEN, LOW);
+      Serial.println("Set Time with NTP");
       timeClient.update();
-      delay(1000);
+      delay(500);
+      digitalWrite(GREEN, HIGH);
+      delay(500);
     }
+    Serial.print("Set RTC with epochtime: ");
+    Serial.println(timeClient.getEpochTime());
     rtc.adjust(DateTime(timeClient.getEpochTime()));
     lastRefresh = timeClient.getEpochTime();
   }
@@ -169,6 +195,17 @@ void setTime()
 
 void setup()
 {
+
+  pinMode(RED, OUTPUT);
+  pinMode(GREEN, OUTPUT);
+  pinMode(BLUE, OUTPUT);
+
+  pinMode(BUTTON_1, INPUT);
+  pinMode(BUTTON_2, INPUT);
+
+  digitalWrite(RED, LOW);
+  digitalWrite(GREEN, LOW);
+  digitalWrite(BLUE, LOW);
 
   Wire.begin(SDA, SCL);
   Serial.begin(9600);
@@ -180,8 +217,11 @@ void setup()
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED)
   {
-    delay(500);
+    digitalWrite(BLUE, LOW);
+    delay(250);
     Serial.print(".");
+    digitalWrite(BLUE, HIGH);
+    delay(250);
   }
   Serial.println();
 
@@ -204,23 +244,42 @@ void setup()
   setTime();
 }
 
+bool read_button(bool first) {
+  byte button_1_state = digitalRead(BUTTON_1);
+    if (button_1_state != button_1_last_state)
+    {
+      button_1_last_state = button_1_state;
+      if (button_1_state)
+      {
+        if (always_light_on)
+        {
+          always_light_on = false;
+        }
+        else
+        {
+          always_light_on = true;
+          first = true; //reset first to refresh display
+        }
+      }
+    }
+  return first;
+}
+
 void loop()
 {
   static bool first = true;
   static byte lastTime[6] = {0, 0, 0, 0, 0, 0};
   static byte newTime[6] = {0, 0, 0, 0, 0, 0};
   static word buffer[18] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-  setTime();
-  if (displayEnabled())
+  while (true)
   {
+    first = read_button(first);
+    setTime();
+    delay(10);
     getTime(newTime);
     fillBuffer(buffer, newTime, lastTime);
     printTime(buffer, newTime, lastTime, first);
     memcpy(lastTime, newTime, 6 * sizeof(byte));
     first = false;
-  }
-  else
-  {
-    mx.clear();
   }
 }

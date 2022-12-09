@@ -2,3 +2,4 @@
 .vscode
 
 include/wifi_settings.h
+.DS_Store
