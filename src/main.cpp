@@ -38,6 +38,9 @@
 
 #define NTP_UPDATE_INTERVAL 3600
 
+#define TIME_OFFSET_SUMMER 7200
+#define TIME_OFFSET_WINTER 3600
+
 const char *ssid = WIFI_SSID;
 const char *password = WIFI_PASSWORD;
 
@@ -45,7 +48,7 @@ u_int32_t lastRefresh = 0;
 
 #ifdef WIFI
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
+NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", TIME_OFFSET_WINTER, 60000);
 #endif
 
 MD_MAX72XX mx = MD_MAX72XX(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
@@ -226,6 +229,7 @@ void setup()
   Serial.println();
 
   timeClient.begin();
+  
 
 #endif
 
